@@ -10,7 +10,7 @@ import { ChatHeader } from "../chat/ChannelView";
 
 type Tab = "online" | "all" | "pending" | "add";
 
-function FriendRow({ f, onChange }: { f: Friend; onChange: () => void }) {
+function FriendRow({ f, onChange, onAccepted }: { f: Friend; onChange: () => void | Promise<unknown>; onAccepted?: () => void }) {
   const status = usePresence(f.user.id, f.user.status);
   const act = (p: Promise<unknown>, ok?: string) => p.then(() => (ok && toast(ok, "success"), onChange())).catch(toastError);
   return (
@@ -30,7 +30,7 @@ function FriendRow({ f, onChange }: { f: Friend; onChange: () => void }) {
         </Tip>
       ) : f.direction === "incoming" ? (
         <Tip label="Aceitar">
-          <button className="icon-btn bg-white/[0.04] hover:!bg-online/15 hover:!text-online" onClick={() => act(api.acceptFriend(f.id), "Agora vocês são amigos.")} aria-label="Aceitar pedido">
+          <button className="icon-btn bg-white/[0.04] hover:!bg-online/15 hover:!text-online" onClick={() => { void api.acceptFriend(f.id).then(async () => { toast("Agora vocês são amigos.", "success"); await onChange(); onAccepted?.(); }).catch(toastError); }} aria-label="Aceitar pedido">
             <Check size={17} />
           </button>
         </Tip>
@@ -79,7 +79,7 @@ export function FriendsView({ onMenu }: { onMenu: () => void }) {
   const [tab, setTab] = useState<Tab>("online");
   const qc = useQueryClient();
   const { data, isPending } = useFriends();
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["friends"] });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["friends"] });
   const accepted = (data ?? []).filter((f) => f.status === "accepted");
   const pending = (data ?? []).filter((f) => f.status === "pending");
   const live = useLive((s) => s.presence);
@@ -126,7 +126,7 @@ export function FriendsView({ onMenu }: { onMenu: () => void }) {
         ) : (
           <>
             <p className="section-label mb-2 px-2">{tab === "online" ? "Online" : tab === "all" ? "Todos os amigos" : "Pendentes"} · {list.length}</p>
-            {list.map((f) => <FriendRow key={f.id} f={f} onChange={refresh} />)}
+            {list.map((f) => <FriendRow key={f.id} f={f} onChange={refresh} onAccepted={f.direction === "incoming" ? () => setTab("all") : undefined} />)}
           </>
         )}
       </div>
