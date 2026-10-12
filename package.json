@@ -1,0 +1,35 @@
+{
+  "name": "vekrom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vekrom — comunidade, jogos e conversas",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:api": "pnpm --filter @vekrom/api dev",
+    "dev:gateway": "pnpm --filter @vekrom/gateway dev",
+    "dev:web": "pnpm --filter @vekrom/web dev",
+    "dev:media": "pnpm --filter @vekrom/media dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @vekrom/api build",
+    "build:gateway": "pnpm --filter @vekrom/gateway build",
+    "build:web": "pnpm --filter @vekrom/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "tsc --noEmit -p tsconfig.base.json",
+    "db:migrate": "psql $DATABASE_URL -f apps/api/src/db/migrations/001_init.sql",
+    "db:seed": "psql $DATABASE_URL -f apps/api/src/db/seed.sql"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "lucide-react": "^1.48.0"
+  }
+}

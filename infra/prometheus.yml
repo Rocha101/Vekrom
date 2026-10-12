@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: vekrom-api
+    static_configs:
+      - targets: ["api:3001"]
+    metrics_path: /metrics
+
+  - job_name: vekrom-gateway
+    static_configs:
+      - targets: ["gateway:3002"]
+    metrics_path: /metrics
+
+  - job_name: postgres
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: redis
+    static_configs:
+      - targets: ["redis-exporter:9121"]

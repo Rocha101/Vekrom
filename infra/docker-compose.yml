@@ -1,0 +1,80 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vekrom
+      POSTGRES_PASSWORD: vekrom
+      POSTGRES_DB: vekrom
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  api:
+    build: ../apps/api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      DATABASE_URL: postgres://vekrom:vekrom@postgres:5432/vekrom
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change-me-dev-secret
+      PORT: 3001
+    ports:
+      - "3001:3001"
+
+  gateway:
+    build: ../apps/gateway
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - api
+    environment:
+      REDIS_URL: redis://redis:6379
+      API_URL: http://api:3001
+      PORT: 3002
+    ports:
+      - "3002:3002"
+
+  web:
+    build: ../apps/web
+    restart: unless-stopped
+    depends_on:
+      - api
+      - gateway
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_GATEWAY_URL: ws://localhost:3002
+    ports:
+      - "3000:3000"
+
+  coturn:
+    # STUB: coturn para voz (SFU/ TURN). Imagem real trocada no deploy.
+    # Para dev local sem TURN: mantém container dummy para outros agentes wiredarem.
+    image: coturn/coturn:4.6.2
+    restart: unless-stopped
+    command:
+      - -n
+      - --realm=vekrom.local
+      - --user=vekrom:change-me
+      - --no-cli
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478"
+      - "5349:5349"
+
+volumes:
+  postgres-data:
+  redis-data:
