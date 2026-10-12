@@ -9,7 +9,7 @@ function Pill({ active, unread }: { active: boolean; unread: boolean }) {
   return (
     <span
       aria-hidden
-      className={`absolute left-0 w-1 rounded-r-full bg-ink-1 transition-[height,opacity] duration-200 ease-out ${
+      className={`absolute left-0 top-1/2 w-1 -translate-y-1/2 rounded-r-full bg-ink-1 transition-[height,opacity] duration-200 ease-out ${
         active ? "h-9 opacity-100" : unread ? "h-2 opacity-100 group-hover:h-5" : "h-2 opacity-0 group-hover:h-5 group-hover:opacity-100"
       }`}
     />

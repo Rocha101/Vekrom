@@ -40,7 +40,9 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   return (
     <div className="relative min-h-dvh overflow-hidden bg-bg-0">
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-volt/[0.06] blur-[120px]" />
+        <img src={voltWorld} alt="" width={1536} height={1024} fetchPriority="high" className="h-full w-full object-cover object-[70%_60%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-bg-0 via-bg-0/75 to-bg-0/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg-0 via-transparent to-bg-0/60" />
       </div>
 
       <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-4 pb-[calc(32px+var(--safe-bottom))] pt-[calc(24px+var(--safe-top))] sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
@@ -60,11 +62,6 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
             <li className="flex items-center gap-2"><MessagesSquare size={16} className="text-volt" /> Chat ao vivo</li>
             <li className="flex items-center gap-2"><Link2 size={16} className="text-volt" /> Convite por link</li>
           </ul>
-          <div aria-hidden className="relative mt-8 overflow-hidden rounded-2xl border border-white/[0.08] lg:mt-10">
-            <img src={voltWorld} alt="" width={1536} height={1024} fetchPriority="high" className="aspect-[16/7] w-full object-cover object-[center_60%] sm:aspect-[16/9]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-bg-0/70 via-transparent to-transparent" />
-            <span className="absolute bottom-4 left-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-1">Jogue junto.</span>
-          </div>
         </section>
 
         <section className="w-full lg:justify-self-end">
