@@ -51,7 +51,7 @@ function AddFriend({ onDone }: { onDone: () => void }) {
     e.preventDefault();
     setBusy(true);
     try {
-      const r = await api.addFriend(name.trim().replace(/^@/, ""));
+      const r = await api.addFriend(name.trim().replace(/^@/, "").replace(/#\d{4}$/, "")); // aceita o formato antigo nome#1234
       toast(r.accepted ? `Você e ${name} agora são amigos.` : `Pedido enviado para ${name}.`, "success");
       setName("");
       onDone();

@@ -23,7 +23,7 @@ pnpm db:seed             # dados de exemplo: alice@example.com / bob@example.com
 pnpm dev                 # api :3001, gateway :3002, web :5173
 ```
 
-Sem Postgres a API cai para **pg-mem** com um usuário demo (`demo@vekrom.gg` / `password123`), e sem Redis usa memória. Isso **só existe fora de produção**: com `NODE_ENV=production` a API e o gateway param com erro se o banco ou o Redis não responderem.
+Sem Postgres a API cai para **pg-mem** vazio (crie a conta pelo cadastro), e sem Redis usa memória. Isso **só existe fora de produção**: com `NODE_ENV=production` a API e o gateway param com erro se o banco ou o Redis não responderem.
 
 Para o web falar com a API local: `VITE_API_URL=http://localhost:3001 VITE_GATEWAY_URL=ws://localhost:3002 pnpm dev:web`.
 
