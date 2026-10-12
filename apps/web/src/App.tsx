@@ -220,13 +220,25 @@ function Shell() {
 
   const voice = useVoice();
   const [profileMember, setProfileMember] = useState<ServerMember | null>(null);
-  const { data: apiFriends = [] } = useQuery({ queryKey: ["friends"], queryFn: api.friends, enabled: Boolean(token) });
-  const friends: SocialUser[] = apiFriends.filter((friend) => friend.status === "accepted").map((friend) => ({
+  const { data: apiFriends = [] } = useQuery({ queryKey: ["friends"], queryFn: api.friends, enabled: Boolean(token), refetchInterval: 15000 });
+  const toSocialUser = (friend: (typeof apiFriends)[number]): SocialUser => ({
     id: String(friend.id), name: friend.username, handle: `@${friend.username}#${friend.discriminator}`, avatar: friend.avatarUrl ?? null,
+  });
+  const friends: SocialUser[] = apiFriends.filter((friend) => friend.status === "accepted").map(toSocialUser);
+  const pendingFriendRequests = apiFriends.filter((friend) => friend.status === "pending" && friend.direction).map((friend) => ({
+    ...toSocialUser(friend), friendshipId: String(friend.friendshipId), direction: friend.direction as "incoming" | "outgoing",
   }));
   const currentProfile: StreamerProfile = { id: userId, name: username, handle: `@${username}`, avatar: avatarUrl, bio, recentStreams: [] };
   const handleAddFriend = async (friendUsername: string) => {
     await api.addFriend(friendUsername);
+    await qc.invalidateQueries({ queryKey: ["friends"] });
+  };
+  const handleAcceptFriendRequest = async (friendshipId: string) => {
+    await api.acceptFriendRequest(friendshipId);
+    await qc.invalidateQueries({ queryKey: ["friends"] });
+  };
+  const handleRemoveFriendRequest = async (friendshipId: string) => {
+    await api.removeFriendRequest(friendshipId);
     await qc.invalidateQueries({ queryKey: ["friends"] });
   };
 
@@ -473,8 +485,11 @@ function Shell() {
               <SocialView
                 onBack={() => setMobileTab("home")}
                 friends={friends}
+                pendingRequests={pendingFriendRequests}
                 onSelectUserForChat={(user) => setSelectedDmUser(user)}
                 onAddFriend={handleAddFriend}
+                onAcceptRequest={handleAcceptFriendRequest}
+                onRemoveRequest={handleRemoveFriendRequest}
               />
             )}
 
@@ -486,8 +501,11 @@ function Shell() {
               <SocialView
                 onBack={() => setMobileTab("home")}
                 friends={friends}
+                pendingRequests={pendingFriendRequests}
                 onSelectUserForChat={(user) => setSelectedDmUser(user)}
                 onAddFriend={handleAddFriend}
+                onAcceptRequest={handleAcceptFriendRequest}
+                onRemoveRequest={handleRemoveFriendRequest}
               />
             )}
           </>

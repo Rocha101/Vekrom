@@ -1,80 +1,132 @@
-import React, { useState } from "react";
-import { ChevronLeft, MoreHorizontal, Search, MessageSquare, UserPlus, Users } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Check, Clock3, MessageSquare, Search, UserPlus, Users, X } from "lucide-react";
 import type { SocialUser } from "../../lib/types";
+
+interface PendingFriendRequest extends SocialUser {
+  friendshipId: string;
+  direction: "incoming" | "outgoing";
+}
 
 interface SocialViewProps {
   onBack?: () => void;
   friends: SocialUser[];
+  pendingRequests: PendingFriendRequest[];
   onSelectUserForChat: (user: SocialUser) => void;
   onAddFriend: (username: string) => Promise<void>;
+  onAcceptRequest: (friendshipId: string) => Promise<void>;
+  onRemoveRequest: (friendshipId: string) => Promise<void>;
 }
 
-export function SocialView({ onBack, friends, onSelectUserForChat, onAddFriend }: SocialViewProps) {
-  const [activeTab, setActiveTab] = useState<"friends" | "chats">("friends");
+export function SocialView({ onBack, friends, pendingRequests, onSelectUserForChat, onAddFriend, onAcceptRequest, onRemoveRequest }: SocialViewProps) {
+  const [activeTab, setActiveTab] = useState<"all" | "pending">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newFriendName, setNewFriendName] = useState("");
-  const [successToast, setSuccessToast] = useState("");
-  const [requestError, setRequestError] = useState("");
-  const filteredFriends = friends.filter((friend) => `${friend.name} ${friend.handle}`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null);
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
+  const incoming = pendingRequests.filter((request) => request.direction === "incoming");
+  const outgoing = pendingRequests.filter((request) => request.direction === "outgoing");
+  const filteredFriends = useMemo(() => friends.filter((friend) => `${friend.name} ${friend.handle}`.toLowerCase().includes(searchQuery.toLowerCase())), [friends, searchQuery]);
+  const filteredIncoming = incoming.filter((friend) => `${friend.name} ${friend.handle}`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredOutgoing = outgoing.filter((friend) => `${friend.name} ${friend.handle}`.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleAddFriend = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!newFriendName.trim()) return;
-    setRequestError("");
+    const username = newFriendName.trim();
+    if (!username) return;
+    setFeedback(null);
     try {
-      await onAddFriend(newFriendName.trim());
-      setSuccessToast("Solicitação de amizade enviada.");
+      await onAddFriend(username);
+      setFeedback({ text: "Pedido de amizade enviado.", error: false });
       setNewFriendName("");
       setShowAddModal(false);
-      setTimeout(() => setSuccessToast(""), 4000);
-    } catch {
-      setRequestError("Não foi possível enviar a solicitação. Confira o nome e tente novamente.");
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      const text = code.includes("user_not_found") ? "Não encontramos essa conta. Confira o nome e o discriminador." :
+        code.includes("use_discriminator") ? "Há mais de uma conta com esse nome. Informe também #0000." :
+        code.includes("incoming_request_exists") ? "Essa pessoa já enviou um pedido. Aceite-o na aba Pendente." :
+        code.includes("already_friends") ? "Vocês já são amigos." :
+        code.includes("request_exists") ? "Você já enviou um pedido para essa pessoa." : "Não foi possível enviar o pedido. Tente novamente.";
+      setFeedback({ text, error: true });
     }
   };
 
-  const avatar = (user: SocialUser, size = "h-11 w-11") => user.avatar
-    ? <img src={user.avatar} alt={user.name} className={`${size} rounded-full border border-white/10 object-cover`} />
-    : <span aria-label={user.name} className={`grid ${size} place-items-center rounded-full border border-white/10 bg-[#242631] text-sm font-semibold text-zinc-200`}>{user.name.slice(0, 2).toUpperCase()}</span>;
+  const runRequestAction = async (friendshipId: string, action: () => Promise<void>, successText: string) => {
+    setBusyRequestId(friendshipId);
+    setFeedback(null);
+    try {
+      await action();
+      setFeedback({ text: successText, error: false });
+    } catch {
+      setFeedback({ text: "Não foi possível atualizar o pedido. Tente novamente.", error: true });
+    } finally {
+      setBusyRequestId(null);
+    }
+  };
+
+  const avatar = (user: SocialUser) => user.avatar
+    ? <img src={user.avatar} alt="" className="h-11 w-11 shrink-0 rounded-full border border-white/10 object-cover" />
+    : <span aria-hidden="true" className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/10 bg-[#242631] text-sm font-semibold text-zinc-200">{user.name.slice(0, 2).toUpperCase()}</span>;
+
+  const renderRequest = (request: PendingFriendRequest, direction: "incoming" | "outgoing") => {
+    const busy = busyRequestId === request.friendshipId;
+    return <div key={request.friendshipId} className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#15171d] px-3 py-3 transition-colors hover:border-white/10 hover:bg-[#1b1d24]">
+      {avatar(request)}
+      <button onClick={() => onSelectUserForChat(request)} className="min-w-0 flex-1 text-left">
+        <span className="block truncate text-sm font-semibold text-white">{request.name}</span>
+        <span className="block truncate text-xs text-zinc-400">{request.handle}</span>
+      </button>
+      {direction === "incoming" ? <>
+        <button disabled={busy} onClick={() => void runRequestAction(request.friendshipId, () => onAcceptRequest(request.friendshipId), `Você e ${request.name} agora são amigos.`)} className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500 text-white transition-colors hover:bg-indigo-400 disabled:opacity-50" title="Aceitar pedido" aria-label={`Aceitar pedido de ${request.name}`}><Check size={17}/></button>
+        <button disabled={busy} onClick={() => void runRequestAction(request.friendshipId, () => onRemoveRequest(request.friendshipId), "Pedido recusado.")} className="grid h-9 w-9 place-items-center rounded-lg bg-[#24262e] text-zinc-300 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:opacity-50" title="Recusar pedido" aria-label={`Recusar pedido de ${request.name}`}><X size={17}/></button>
+      </> : <>
+        <span className="hidden items-center gap-1.5 rounded-lg bg-[#22242b] px-3 py-2 text-xs text-zinc-400 sm:flex"><Clock3 size={14}/> Aguardando</span>
+        <button disabled={busy} onClick={() => void runRequestAction(request.friendshipId, () => onRemoveRequest(request.friendshipId), "Pedido cancelado.")} className="grid h-9 w-9 place-items-center rounded-lg bg-[#24262e] text-zinc-300 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:opacity-50" title="Cancelar pedido" aria-label={`Cancelar pedido para ${request.name}`}><X size={17}/></button>
+      </>}
+    </div>;
+  };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#0d0e12] overflow-y-auto scroll-thin pb-24 md:pb-6">
-      <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[#0d0e12]/90 backdrop-blur-md border-b border-white/[0.05]">
-        <div className="flex items-center gap-2">
-          {onBack && <button onClick={onBack} className="md:hidden p-2 -ml-2 rounded-full text-white/80 hover:bg-white/10" aria-label="Voltar"><ChevronLeft size={24} /></button>}
-          <Users size={20} className="text-[#2563eb]" />
-          <h1 className="text-base font-bold text-white tracking-wide">Amigos & Social</h1>
-        </div>
-        <button onClick={() => setShowAddModal(true)} className="p-2 -mr-2 rounded-full text-white/80 hover:bg-white/10" aria-label="Adicionar amigo"><MoreHorizontal size={22} /></button>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[#0d0e12] pb-24 md:pb-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-[#0d0e12]/95 px-5 py-3 backdrop-blur-md">
+        <div className="flex items-center gap-2.5"><Users size={19} className="text-zinc-400"/><h1 className="text-base font-bold text-white">Amigos</h1></div>
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 rounded-lg bg-indigo-500 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-400"><UserPlus size={16}/><span>Adicionar amigo</span></button>
       </header>
 
-      {successToast && <div role="status" className="mx-4 mt-2 rounded-xl border border-emerald-500/40 bg-emerald-500/20 p-3 text-xs text-emerald-300">{successToast}</div>}
+      {feedback && <div role={feedback.error ? "alert" : "status"} className={`mx-auto mt-3 w-full max-w-3xl px-5 text-sm ${feedback.error ? "text-rose-300" : "text-emerald-300"}`}>{feedback.text}</div>}
 
-      <div className="border-b border-white/[0.08] px-4 max-w-2xl mx-auto w-full">
-        <div className="flex items-center">
-          {(["friends", "chats"] as const).map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex-1 py-3 text-center text-sm font-bold ${activeTab === tab ? "text-white" : "text-zinc-400 hover:text-zinc-200"}`}>{tab === "friends" ? "Amigos" : "Conversas"}{activeTab === tab && <span className="absolute bottom-0 left-6 right-6 h-0.5 rounded-full bg-[#2563eb]" />}</button>)}
-        </div>
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-1 border-b border-white/[0.08] px-5">
+        {(["all", "pending"] as const).map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors ${activeTab === tab ? "text-white" : "text-zinc-400 hover:text-zinc-200"}`}>
+          {tab === "all" ? "Todos" : <>Pendente{pendingRequests.length > 0 && <span className="rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] leading-none text-white">{pendingRequests.length}</span>}</>}
+          {activeTab === tab && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-indigo-400"/>}
+        </button>)}
       </div>
 
-      <div className="px-4 pt-4 max-w-2xl mx-auto w-full flex items-center gap-2">
-        <div className="relative flex-1"><Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Buscar amigos" className="w-full rounded-xl border border-white/[0.06] bg-[#161821] py-2 pl-9 pr-3 text-xs text-white outline-none focus:border-[#2563eb]/60" /></div>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#1b1e2a] p-2 text-xs font-bold text-zinc-300 hover:bg-[#2563eb] hover:text-white"><UserPlus size={16} /><span className="hidden sm:inline">Adicionar Amigo</span></button>
+      <div className="mx-auto w-full max-w-3xl px-5 pt-4">
+        <div className="relative"><Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500"/><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Buscar" className="w-full rounded-xl border border-white/[0.08] bg-[#17191f] py-3 pl-10 pr-4 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-indigo-400/60"/></div>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl space-y-3 px-4 py-4">
-        {activeTab === "friends" ? <>
-          <h2 className="px-1 text-xs font-bold uppercase tracking-wider text-zinc-400">Amigos ({filteredFriends.length})</h2>
-          {filteredFriends.length === 0 ? <p className="rounded-xl border border-white/[0.06] p-5 text-center text-sm text-zinc-400">{searchQuery ? "Nenhum amigo encontrado." : "Você ainda não tem amigos adicionados."}</p> : <div className="divide-y divide-white/[0.04]">{filteredFriends.map((user) => <div key={user.id} className="group flex items-center justify-between rounded-xl px-2 py-3 hover:bg-[#161821]/80">
-            <button onClick={() => onSelectUserForChat(user)} className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left">{avatar(user)}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-white group-hover:text-blue-400">{user.name}</span><span className="block truncate text-xs text-zinc-400">{user.handle}</span></span></button>
-            <button onClick={() => onSelectUserForChat(user)} className="rounded-xl p-2 text-zinc-400 hover:bg-white/10 hover:text-white" title={`Enviar mensagem para ${user.name}`}><MessageSquare size={18} /></button>
-          </div>)}</div>}
-        </> : <p className="rounded-xl border border-white/[0.06] p-5 text-center text-sm text-zinc-400">As conversas aparecerão aqui quando houver mensagens diretas.</p>}
-      </div>
+      <main className="mx-auto w-full max-w-3xl space-y-6 px-5 py-5">
+        {activeTab === "all" ? <section>
+          <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Todos os amigos — {filteredFriends.length}</h2>
+          {filteredFriends.length === 0 ? <div className="rounded-xl border border-white/[0.06] bg-[#12141a] px-4 py-8 text-center text-sm text-zinc-400">{searchQuery ? "Nenhum amigo encontrado." : "Você ainda não tem amigos. Adicione alguém pelo nome de usuário."}</div> : <div className="space-y-2">{filteredFriends.map((user) => <div key={user.id} className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#15171d] px-3 py-3 transition-colors hover:border-white/10 hover:bg-[#1b1d24]">{avatar(user)}<button onClick={() => onSelectUserForChat(user)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold text-white">{user.name}</span><span className="block truncate text-xs text-zinc-400">{user.handle}</span></button><button onClick={() => onSelectUserForChat(user)} className="grid h-9 w-9 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title={`Enviar mensagem para ${user.name}`} aria-label={`Conversar com ${user.name}`}><MessageSquare size={18}/></button></div>)}</div>}
+        </section> : <>
+          <section>
+            <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Recebidos — {filteredIncoming.length}</h2>
+            {filteredIncoming.length === 0 ? <p className="rounded-xl border border-white/[0.06] bg-[#12141a] px-4 py-5 text-sm text-zinc-500">Nenhum pedido recebido.</p> : <div className="space-y-2">{filteredIncoming.map((request) => renderRequest(request, "incoming"))}</div>}
+          </section>
+          <section>
+            <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Enviados — {filteredOutgoing.length}</h2>
+            {filteredOutgoing.length === 0 ? <p className="rounded-xl border border-white/[0.06] bg-[#12141a] px-4 py-5 text-sm text-zinc-500">Nenhum pedido enviado.</p> : <div className="space-y-2">{filteredOutgoing.map((request) => renderRequest(request, "outgoing"))}</div>}
+          </section>
+        </>}
+      </main>
 
-      {showAddModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"><div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#161822] p-6 shadow-2xl">
-        <h3 className="mb-2 text-base font-bold text-white">Adicionar Amigo</h3><p className="mb-4 text-xs text-zinc-400">Digite o nome de usuário para enviar uma solicitação de amizade.</p>
-        <form onSubmit={handleAddFriend} className="space-y-4">{requestError && <p role="alert" className="text-xs text-rose-300">{requestError}</p>}<input autoFocus placeholder="Nome de usuário" value={newFriendName} onChange={(event) => setNewFriendName(event.target.value)} className="w-full rounded-xl border border-white/10 bg-[#0d0e12] px-4 py-3 text-sm text-white outline-none focus:border-[#2563eb]" />
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddModal(false)} className="rounded-xl px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white">Cancelar</button><button type="submit" className="rounded-xl bg-[#2563eb] px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Enviar Solicitação</button></div>
+      {showAddModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAddModal(false); }}><div role="dialog" aria-modal="true" aria-labelledby="add-friend-title" className="w-full max-w-md rounded-2xl border border-white/10 bg-[#191b22] p-6 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between"><div><h3 id="add-friend-title" className="text-lg font-bold text-white">Adicionar amigo</h3><p className="mt-1 text-sm text-zinc-400">Envie um pedido usando o nome de usuário.</p></div><button onClick={() => setShowAddModal(false)} className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/10 hover:text-white" aria-label="Fechar"><X size={18}/></button></div>
+        <form onSubmit={handleAddFriend} className="space-y-4"><label className="block text-xs font-semibold text-zinc-300">Nome de usuário<input autoFocus value={newFriendName} onChange={(event) => setNewFriendName(event.target.value)} placeholder="exemplo ou exemplo#0001" maxLength={40} className="mt-2 w-full rounded-xl border border-white/10 bg-[#101116] px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-indigo-400/70"/></label>
+          <p className="text-xs leading-relaxed text-zinc-500">Se houver contas com o mesmo nome, informe também o código após #.</p>
+          <div className="flex justify-end gap-2 pt-1"><button type="button" onClick={() => setShowAddModal(false)} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:bg-white/[0.06]">Cancelar</button><button type="submit" disabled={!newFriendName.trim()} className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">Enviar pedido</button></div>
         </form>
       </div></div>}
     </div>

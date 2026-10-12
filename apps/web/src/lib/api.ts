@@ -4,7 +4,15 @@ export interface Server { id: string; name: string; iconUrl: string | null; owne
 export interface Channel { id: string; serverId: string | null; name: string; type: string; topic: string | null; position: number; isPrivate?: boolean; userLimit?: number; }
 export interface ChatAttachment { url: string; name: string; contentType: string; sizeBytes: number; }
 export interface ChatMessage { id: string; channelId: string; authorId: string; content: string; createdAt: string; editedAt: string | null; attachments?: ChatAttachment[]; author?: { id: string; username: string } | null; }
-export interface Friend { id: string; username: string; discriminator: string; avatarUrl: string | null; status: "accepted" | "pending" | "blocked"; }
+export interface Friend {
+  id: string;
+  friendshipId: string;
+  username: string;
+  discriminator: string;
+  avatarUrl: string | null;
+  status: "accepted" | "pending" | "blocked";
+  direction: "incoming" | "outgoing" | null;
+}
 export interface DirectMessage { id: string | number; senderId: string; recipientId: string; content: string; createdAt: string; attachments?: ChatAttachment[]; }
 
 function token(): string | null { return localStorage.getItem("vekrom:token"); }
@@ -15,7 +23,11 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { "Content-Type": "application/json", ...(token() ? { Authorization: `Bearer ${token()}` } : {}), ...(init.headers ?? {}) },
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`API ${res.status} ${path}`);
+  if (!res.ok) {
+    let detail = "";
+    try { detail = String((await res.json() as { error?: string }).error ?? ""); } catch { /* response may not be JSON */ }
+    throw new Error(detail || `API ${res.status} ${path}`);
+  }
   return res.json() as Promise<T>;
 }
 
@@ -80,6 +92,12 @@ export const api = {
   },
   addFriend(username: string): Promise<unknown> {
     return req("/friends", { method: "POST", body: JSON.stringify({ username }) });
+  },
+  acceptFriendRequest(friendshipId: string): Promise<{ ok: boolean }> {
+    return req(`/friends/${encodeURIComponent(friendshipId)}/accept`, { method: "POST" });
+  },
+  removeFriendRequest(friendshipId: string): Promise<{ ok: boolean }> {
+    return req(`/friends/${encodeURIComponent(friendshipId)}`, { method: "DELETE" });
   },
   directMessages(userId: string): Promise<DirectMessage[]> {
     return req<{ items: DirectMessage[] }>(`/dms/${encodeURIComponent(userId)}/messages`).then((r) => r.items);

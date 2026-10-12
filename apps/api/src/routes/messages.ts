@@ -115,7 +115,11 @@ export const messageRoutes: FastifyPluginAsync = async (app) => {
   app.get("/friends", { preHandler: [app.authenticate] }, async (req) => {
     const uid = (req.user as { sub: string }).sub;
     const { rows } = await pool.query(
-      `SELECT u.id, u.username, u.discriminator, u.avatar_url AS "avatarUrl", f.status
+      `SELECT u.id, u.username, u.discriminator, u.avatar_url AS "avatarUrl", f.status,
+              f.id AS "friendshipId",
+              CASE WHEN f.status='pending' AND f.addressee_id=$1 THEN 'incoming'
+                   WHEN f.status='pending' AND f.requester_id=$1 THEN 'outgoing'
+                   ELSE NULL END AS direction
        FROM friendships f JOIN users u ON u.id = CASE WHEN f.requester_id=$1 THEN f.addressee_id ELSE f.requester_id END
        WHERE f.requester_id=$1 OR f.addressee_id=$1`,
       [uid],
@@ -125,13 +129,54 @@ export const messageRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/friends", { preHandler: [app.authenticate] }, async (req, reply) => {
     const uid = (req.user as { sub: string }).sub;
-    const { username } = (req.body ?? {}) as { username?: string };
-    const target = await pool.query(`SELECT id FROM users WHERE username=$1`, [username]);
-    if (!target.rows[0]) return reply.code(404).send({ error: "user_not_found" });
-    await pool.query(
-      `INSERT INTO friendships (requester_id, addressee_id, status) VALUES ($1,$2,'pending') ON CONFLICT DO NOTHING`,
-      [uid, target.rows[0].id],
+    const body = z.object({ username: z.string().trim().min(1).max(40) }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: "invalid_username" });
+    const match = body.data.username.match(/^(.+?)(?:#(\d{4}))?$/);
+    if (!match) return reply.code(400).send({ error: "invalid_username" });
+    const target = await pool.query(
+      `SELECT id FROM users WHERE lower(username)=lower($1) AND ($2::text IS NULL OR discriminator=$2) AND id<>$3 ORDER BY id LIMIT 2`,
+      [match[1].trim(), match[2] ?? null, uid],
     );
+    if (!target.rows[0]) return reply.code(404).send({ error: "user_not_found" });
+    if (target.rows.length > 1) return reply.code(409).send({ error: "use_discriminator" });
+    const targetId = String(target.rows[0].id);
+    const existing = await pool.query(
+      `SELECT id, status, requester_id AS "requesterId" FROM friendships
+       WHERE (requester_id=$1 AND addressee_id=$2) OR (requester_id=$2 AND addressee_id=$1) LIMIT 1`,
+      [uid, targetId],
+    );
+    if (existing.rows[0]) {
+      if (existing.rows[0].status === "pending" && String(existing.rows[0].requesterId) === targetId) {
+        return reply.code(409).send({ error: "incoming_request_exists" });
+      }
+      return reply.code(409).send({ error: existing.rows[0].status === "accepted" ? "already_friends" : "request_exists" });
+    }
+    await pool.query(`INSERT INTO friendships (requester_id, addressee_id, status) VALUES ($1,$2,'pending')`, [uid, targetId]);
+    return reply.code(201).send({ ok: true });
+  });
+
+  app.post("/friends/:friendshipId/accept", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const uid = (req.user as { sub: string }).sub;
+    const { friendshipId } = req.params as { friendshipId: string };
+    if (!/^\d+$/.test(friendshipId)) return reply.code(400).send({ error: "invalid_request" });
+    const { rows } = await pool.query(
+      `UPDATE friendships SET status='accepted', updated_at=NOW()
+       WHERE id=$1 AND addressee_id=$2 AND status='pending' RETURNING id`,
+      [friendshipId, uid],
+    );
+    if (!rows[0]) return reply.code(404).send({ error: "request_not_found" });
+    return { ok: true };
+  });
+
+  app.delete("/friends/:friendshipId", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const uid = (req.user as { sub: string }).sub;
+    const { friendshipId } = req.params as { friendshipId: string };
+    if (!/^\d+$/.test(friendshipId)) return reply.code(400).send({ error: "invalid_request" });
+    const { rows } = await pool.query(
+      `DELETE FROM friendships WHERE id=$1 AND (requester_id=$2 OR addressee_id=$2) AND status <> 'blocked' RETURNING id`,
+      [friendshipId, uid],
+    );
+    if (!rows[0]) return reply.code(404).send({ error: "request_not_found" });
     return { ok: true };
   });
 
