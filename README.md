@@ -1,15 +1,37 @@
-# Vekrom: comunidade, jogos e conversas
+<div align="center">
+  <img src="apps/web/public/favicon.svg" alt="Símbolo Vekrom" width="88" />
+  <h1>VEKROM</h1>
+  <p><strong>Seu squad tem casa.</strong></p>
+  <p>Comunidades, canais de voz e conversas em tempo real para jogar junto.</p>
+  <p><a href="https://144-33-6-56.sslip.io">Abrir o app</a> · <a href="#rodar-local">Rodar local</a> · <a href="#produção-vm-oracle-1-gb">Produção</a></p>
+</div>
 
-Servidores, canais de texto e voz, DMs, amigos, convites por link e chamadas com tela, em tempo real.
+![Identidade Volt: campanha, ícone e aplicações da marca](docs/images/volt-brand.webp)
 
-```
-apps/api       REST (Fastify 5 + Postgres + Redis)
-apps/gateway   WebSocket (ws): eventos em tempo real, presença, sinalização de voz
-apps/web       React 18 + Vite + Tailwind + Radix + React Query + Zustand
-apps/media     stub
-infra/         Caddy, systemd, Postgres/Redis para 1 GB, coturn
-scripts/       deploy, backup, restore, teste de fumaça
-```
+## O que tem no app
+
+| Comunidade | Conversa | Sua conta |
+| --- | --- | --- |
+| Servidores e canais | Chat ao vivo e DMs | Cadastro e login |
+| Convites por link | Reações e edição | Amigos e presença |
+| Cargos e permissões | Voz, câmera e tela | Perfil e configurações |
+
+Interface responsiva com a identidade **Volt**: grafite, verde-limão e um símbolo de convergência. A marca aparece no login, no cadastro, na navegação, nos convites e no carregamento.
+
+![Arte Volt usada no login e no cadastro](apps/web/src/assets/volt-world.webp)
+
+As imagens acima são a arte e as aplicações da identidade, não capturas de telas do produto. A arte é gerada por IA; o símbolo do app é SVG. O WebP do login entra no build com nome versionado para cache.
+
+## Estrutura
+
+| Pasta | Responsabilidade | Stack |
+| --- | --- | --- |
+| `apps/web` | Interface | React 18, Vite, Tailwind, Radix, React Query, Zustand |
+| `apps/api` | API REST e persistência | Fastify 5, Postgres, Redis |
+| `apps/gateway` | Chat, presença e sinalização de voz | WebSocket |
+| `infra` | Serviços, HTTPS e TURN | Caddy, systemd, coturn |
+| `scripts` | Deploy, backup, restauração e smoke | Bash, Node |
+| `apps/media` | Reservado, sem implementação | Stub |
 
 ## Rodar local
 
@@ -138,3 +160,19 @@ Para ligar:
 | Headers | CSP, HSTS, `nosniff`, `Referrer-Policy`, `frame-ancestors 'none'` e sem `Server`. |
 | Logs | Pino estruturado, sem `authorization`, cookie ou `set-cookie`. |
 | Conta | Exclusão de conta (LGPD) apaga os servidores próprios, as mensagens e as sessões. A troca de senha derruba as outras sessões. |
+
+## Limitações conhecidas
+
+- Chamadas por DM ainda não notificam a outra pessoa com toque.
+- Compartilhamento de tela não está disponível no celular.
+- A voz em redes restritas depende das portas e da ativação do TURN descritas acima.
+- A VM tem 1 GB de RAM; a capacidade com muitos usuários simultâneos não foi medida.
+
+## Identidade visual
+
+- Acento: `#D7FF3F`; texto principal: `#F4F5EF`.
+- Símbolo: `apps/web/public/favicon.svg`; componente compartilhado: `Logo` em `apps/web/src/components/ui.tsx`.
+- Arte do login: `apps/web/src/assets/volt-world.webp`.
+- Prancha da marca: `docs/images/volt-brand.webp`.
+
+A arte de campanha fica no login e no cadastro; a área de conversa mantém o foco nas mensagens.

@@ -3,49 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, Headphones, Link2, MessagesSquare } from "lucide-react";
 import { api, ApiError, setAccessToken } from "../../lib/api";
 import { useSession } from "../../lib/store";
-import { Avatar, Logo, Spinner } from "../../components/ui";
-
-const DEMO_PEOPLE = [
-  { id: "11", username: "nina.gg" },
-  { id: "27", username: "kaue_" },
-  { id: "33", username: "bia" },
-  { id: "48", username: "rafa.exe" },
-];
-
-/** Cena do produto: um canal de voz ao vivo + mensagens, em vidro. Puramente decorativa. */
-function ProductScene() {
-  return (
-    <div aria-hidden className="relative mx-auto mt-10 hidden w-full max-w-[460px] select-none lg:block">
-      <div className="glass rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[13px] font-semibold text-ink-1">
-            <Headphones size={15} className="text-volt" /> Squad ranqueada
-          </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-live/15 px-2 py-0.5 text-[11px] font-semibold text-live">
-            <span className="h-1.5 w-1.5 rounded-full bg-live" /> AO VIVO
-          </span>
-        </div>
-        <div className="mt-4 grid grid-cols-4 gap-3">
-          {DEMO_PEOPLE.map((p, i) => (
-            <div key={p.id} className="flex flex-col items-center gap-2 rounded-xl bg-white/[0.03] py-3 ring-1 ring-inset ring-white/[0.06]">
-              <Avatar user={{ ...p, avatarUrl: null }} size={40} speaking={i === 1} />
-              <span className="text-[11px] text-ink-3">{p.username}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="glass absolute -bottom-12 -right-6 w-[260px] rounded-xl p-3">
-        <div className="flex gap-2.5">
-          <Avatar user={{ id: "27", username: "kaue_", avatarUrl: null }} size={28} />
-          <div className="min-w-0">
-            <p className="text-[12px] font-semibold text-ink-1">kaue_ <span className="font-normal text-ink-4">agora</span></p>
-            <p className="text-[12px] text-ink-2">bora mais uma? tô no <span className="rounded-sm bg-volt/15 px-0.5 text-volt">#ranked</span></p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { Logo, Spinner } from "../../components/ui";
+import voltWorld from "../../assets/volt-world.webp";
 
 export default function AuthPage({ mode }: { mode: "login" | "register" }) {
   const nav = useNavigate();
@@ -80,24 +39,18 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-bg-0">
-      {/* Luz volt + grade fina: identidade sem poluir. */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-volt/[0.09] blur-[120px]" />
-        <div className="absolute -bottom-60 right-[-10%] h-[520px] w-[620px] rounded-full bg-[#3b5bff]/[0.08] blur-[140px]" />
-        <div
-          className="absolute inset-0 opacity-[0.35] [mask-image:radial-gradient(ellipse_at_30%_20%,black,transparent_70%)]"
-          style={{ backgroundImage: "linear-gradient(rgb(255 255 255/0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255/0.05) 1px, transparent 1px)", backgroundSize: "56px 56px" }}
-        />
+        <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-volt/[0.06] blur-[120px]" />
       </div>
 
       <div className="relative mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-4 pb-[calc(32px+var(--safe-bottom))] pt-[calc(24px+var(--safe-top))] sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
         <section className="lg:pb-16">
           <div className="flex items-center gap-2.5">
             <Logo size={34} />
-            <span className="font-display text-[19px] font-bold tracking-tight">vekrom</span>
+            <span className="font-display text-[19px] font-bold tracking-[-0.04em]">VEKROM</span>
           </div>
           <h1 className="mt-8 font-display text-[34px] font-bold leading-[1.02] tracking-[-0.02em] text-ink-1 [text-wrap:balance] sm:text-[52px] lg:mt-14 lg:text-[60px]">
-            Seu squad tem <span className="text-volt">casa</span>.
+            Seu squad<br /><span className="text-volt">tem casa.</span>
           </h1>
           <p className="mt-4 max-w-md text-[15px] leading-relaxed text-ink-2 [text-wrap:pretty] sm:text-[16px]">
             Servidores, canais de voz e chat em tempo real para jogar junto, combinar a próxima e não perder nada.
@@ -107,7 +60,11 @@ export default function AuthPage({ mode }: { mode: "login" | "register" }) {
             <li className="flex items-center gap-2"><MessagesSquare size={16} className="text-volt" /> Chat ao vivo</li>
             <li className="flex items-center gap-2"><Link2 size={16} className="text-volt" /> Convite por link</li>
           </ul>
-          <ProductScene />
+          <div aria-hidden className="relative mt-8 overflow-hidden rounded-2xl border border-white/[0.08] lg:mt-10">
+            <img src={voltWorld} alt="" width={1536} height={1024} fetchPriority="high" className="aspect-[16/7] w-full object-cover object-[center_60%] sm:aspect-[16/9]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-bg-0/70 via-transparent to-transparent" />
+            <span className="absolute bottom-4 left-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-1">Jogue junto.</span>
+          </div>
         </section>
 
         <section className="w-full lg:justify-self-end">

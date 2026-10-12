@@ -233,7 +233,7 @@ export function Logo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
       <rect width="64" height="64" rx="18" fill="rgb(var(--bg-3))" />
-      <path d="M15 17h9.5L32 38.5 39.5 17H49L36.5 47h-9z" fill="rgb(var(--volt))" />
+      <path d="M9 14h20l10 16-7 11-11-17h-5l20 29H24L9 14Zm33 0h13L39 47l-6-10 10-15h-7l6-8Z" fill="rgb(var(--volt))" />
     </svg>
   );
 }
