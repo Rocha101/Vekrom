@@ -12,7 +12,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // vendor estável em chunk próprio: cache longo sobrevive aos deploys do app
-        manualChunks: { react: ["react", "react-dom", "react-router-dom"], data: ["@tanstack/react-query", "@tanstack/react-virtual", "zustand"], radix: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-tooltip"] },
+        manualChunks: { react: ["react", "react-dom", "react-router-dom", "@tanstack/react-query", "@tanstack/react-virtual", "zustand"], radix: ["@radix-ui/react-dialog", "@radix-ui/react-dropdown-menu", "@radix-ui/react-tooltip"] },
       },
     },
   },

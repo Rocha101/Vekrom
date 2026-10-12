@@ -29,7 +29,7 @@ ORIGIN=$(envget CORS_ORIGIN | cut -d, -f1)
   npx tsc --noEmit
   npx vite build --outDir dist-next --emptyOutDir
   # Mantém os assets antigos por 14 dias: quem está com a aba aberta não quebra ao trocar de tela.
-  [ -d dist/assets ] && cp -rnp dist/assets/. dist-next/assets/
+  [ -d dist/assets ] && cp -rp --update=none dist/assets/. dist-next/assets/
   find dist-next/assets -type f -mtime +14 -delete
   rm -rf dist-prev && { [ -d dist ] && mv dist dist-prev || true; } && mv dist-next dist && rm -rf dist-prev
 )

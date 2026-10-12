@@ -164,8 +164,9 @@ try {
   const fake = new FormData();
   fake.append("file", new Blob(["<script>alert(1)</script>"], { type: "image/png" }), "x.png");
   check("upload disfarçado (texto como .png) = 415", (await call("POST", "/upload", { token: a.token, raw: fake })).status === 415);
-  const trav = await fetch(`${API}/files/..%2F..%2F.env`);
-  check("path traversal em /files = 404", trav.status === 404);
+  // Atrás do Caddy o caminho é normalizado e cai no index.html do app; direto na API, 404. Nunca o arquivo.
+  const travBody = await (await fetch(`${API}/files/..%2F..%2F.env`)).text();
+  check("path traversal em /files não vaza arquivo", !/DATABASE_URL|JWT_SECRET/.test(travBody));
 
   const dm = await call("POST", `/dms/${b.id}/messages`, { token: a.token, body: { content: "oi b" } });
   check("DM entre quem divide servidor", dm.status === 200);
