@@ -5,7 +5,6 @@ import {
   Plus,
   Users,
   Radio,
-  Flame,
   Mic,
   MicOff,
   Headphones,
@@ -29,8 +28,7 @@ import { UserSettingsModal } from "../settings/UserSettingsModal";
 import { ServerSettingsModal } from "../servers/ServerSettingsModal";
 import { ChannelSettingsModal } from "../channels/ChannelSettingsModal";
 import type { ServerRole } from "../../stores";
-import { JESUS_BROWN_CHAT, CURRENT_STREAMER, SOCIAL_PEOPLE, SocialUser } from "../../lib/mockData";
-import { VerifiedBadge } from "../../components/ui/Badges";
+import type { SocialUser } from "../../lib/types";
 
 interface ChannelSidebarProps {
   currentServer: Server | null;
@@ -53,6 +51,7 @@ interface ChannelSidebarProps {
   onDeleteChannel: (channelId: string) => void;
   // DMs / Social Mode props
   activeDmUserId: string | null;
+  friends: SocialUser[];
   onSelectDmUser: (user: SocialUser) => void;
   onOpenSocial: () => void;
   // User & Voice props
@@ -69,7 +68,8 @@ interface ChannelSidebarProps {
   };
 }
 
-function DMStatusIndicator({ status }: { status: "streaming" | "online" | "idle" | "offline" | "dnd" }) {
+function DMStatusIndicator({ status }: { status?: "streaming" | "online" | "idle" | "offline" | "dnd" }) {
+  if (!status) return null;
   if (status === "online") {
     return <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#10121a] block shadow-sm" title="Disponível" />;
   }
@@ -118,14 +118,14 @@ function DMRow({
     >
       {/* Avatar aumentado para w-10 h-10 com indicador de status autêntico */}
       <div className="relative flex-shrink-0">
-        <img
+        {user.avatar ? <img
           src={user.avatar}
           alt={user.name}
           className="w-10 h-10 rounded-full object-cover transition-transform group-hover:scale-105"
-        />
-        <div className="absolute -bottom-0.5 -right-0.5">
+        /> : <span className="grid h-10 w-10 place-items-center rounded-full bg-[#242631] text-sm font-semibold text-zinc-200">{user.name.slice(0, 2).toUpperCase()}</span>}
+        {user.status && <div className="absolute -bottom-0.5 -right-0.5">
           <DMStatusIndicator status={user.status} />
-        </div>
+        </div>}
       </div>
 
       {/* Textos com nova tipografia e bio abaixo do nome */}
@@ -138,17 +138,6 @@ function DMRow({
           >
             {user.name}
           </span>
-          {user.badge && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-white/[0.08] text-zinc-300 rounded border border-white/[0.06] flex-shrink-0">
-              {user.badge}
-            </span>
-          )}
-          {user.verified && !user.badge && (
-            <VerifiedBadge size={13} className="flex-shrink-0" />
-          )}
-          {user.streak && (
-            <Flame size={13} className="text-amber-400 fill-amber-400 flex-shrink-0" />
-          )}
         </div>
 
         {/* Bio em letras pequenas abaixo do nome (conforme solicitado e visto na Imagem 2!) */}
@@ -180,6 +169,7 @@ export function ChannelSidebar({
   onUpdateChannel,
   onDeleteChannel,
   activeDmUserId,
+  friends,
   onSelectDmUser,
   onOpenSocial,
   username,
@@ -377,15 +367,7 @@ export function ChannelSidebar({
               </div>
 
               <div className="space-y-1">
-                {/* Jesus Brown thread */}
-                <DMRow
-                  user={JESUS_BROWN_CHAT.user}
-                  isActive={activeDmUserId === JESUS_BROWN_CHAT.user.id}
-                  onSelect={() => onSelectDmUser(JESUS_BROWN_CHAT.user)}
-                />
-
-                {/* Other friends */}
-                {SOCIAL_PEOPLE.map((u) => (
+                {friends.map((u) => (
                   <DMRow
                     key={u.id}
                     user={u}
@@ -393,6 +375,7 @@ export function ChannelSidebar({
                     onSelect={() => onSelectDmUser(u)}
                   />
                 ))}
+                {friends.length === 0 && <p className="px-2 py-2 text-xs text-zinc-500">Seus amigos aparecerão aqui.</p>}
               </div>
             </div>
           </div>

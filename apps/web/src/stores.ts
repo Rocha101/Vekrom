@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { SocialUser, StreamerProfile, CURRENT_STREAMER } from "./lib/mockData";
+import type { SocialUser, StreamerProfile } from "./lib/types";
 import type { ChatAttachment } from "./lib/api";
 
 // Move saved client data to the new Vekrom namespace without logging users out.
@@ -40,10 +40,20 @@ interface AuthState {
   }) => void;
 }
 
+const storedToken = localStorage.getItem("vekrom:token");
+const storedUserId = localStorage.getItem("vekrom:uid");
+const storedUsername = localStorage.getItem("vekrom:username");
+const storedDemoSession = Boolean(storedToken?.startsWith("demo_token") || storedUserId === "usr_demo");
+if (storedDemoSession) {
+  localStorage.removeItem("vekrom:token");
+  localStorage.removeItem("vekrom:uid");
+  localStorage.removeItem("vekrom:username");
+}
+
 export const useAuth = create<AuthState>((set) => ({
-  token: localStorage.getItem("vekrom:token") || "demo_token_vekrom_2026",
-  userId: localStorage.getItem("vekrom:uid") || "usr_demo",
-  username: localStorage.getItem("vekrom:username") || "Awkiruun",
+  token: storedDemoSession ? null : storedToken,
+  userId: storedDemoSession ? null : storedUserId,
+  username: storedDemoSession ? null : storedUsername,
   avatarUrl: localStorage.getItem("vekrom:avatar") || null,
   bio: localStorage.getItem("vekrom:bio") || "",
   pronouns: localStorage.getItem("vekrom:pronouns") || "",
@@ -143,7 +153,7 @@ export const useUI = create<UIState>((set) => ({
   showChannels: false,
   mobileTab: "social",
   selectedDmUser: null,
-  activeStreamer: CURRENT_STREAMER,
+  activeStreamer: null,
   setServer: (serverId) => set({ serverId, channelId: null, selectedDmUser: null }),
   setChannel: (channelId) => set({ channelId, showChannels: false, selectedDmUser: null }),
   toggleMembers: () => set((s) => ({ showMembers: !s.showMembers })),
@@ -278,72 +288,45 @@ export interface MessageModel {
   attachments?: ChatAttachment[];
 }
 
-const DEFAULT_SERVERS: ServerModel[] = [
-  { id: "srv_val", name: "VALORANT Elite", iconUrl: null, ownerId: "u1", createdAt: "2026-01-01" },
-  { id: "srv_ow", name: "Overwatch Squad", iconUrl: null, ownerId: "u2", createdAt: "2026-01-01" },
-  { id: "srv_dev", name: "Game Dev & Design", iconUrl: null, ownerId: "u3", createdAt: "2026-01-01" },
-];
-
-const DEFAULT_CHANNELS: Record<string, ChannelModel[]> = {
-  srv_val: [
-    { id: "ch_val_gen", serverId: "srv_val", name: "geral", type: "text", topic: null, position: 0 },
-    { id: "ch_val_clips", serverId: "srv_val", name: "clipes-e-jogadas", type: "text", topic: null, position: 1 },
-    { id: "ch_val_vc1", serverId: "srv_val", name: "Squad 1 (Voz)", type: "voice", topic: null, position: 2 },
-    { id: "ch_val_vc2", serverId: "srv_val", name: "Sala de Espera", type: "voice", topic: null, position: 3 },
-  ],
-  srv_ow: [
-    { id: "ch_ow_gen", serverId: "srv_ow", name: "geral", type: "text", topic: null, position: 0 },
-    { id: "ch_ow_vc1", serverId: "srv_ow", name: "Voz Equipe", type: "voice", topic: null, position: 1 },
-  ],
-  srv_dev: [
-    { id: "ch_dev_gen", serverId: "srv_dev", name: "geral", type: "text", topic: null, position: 0 },
-    { id: "ch_dev_code", serverId: "srv_dev", name: "showcase", type: "text", topic: null, position: 1 },
-  ],
-};
-
 function loadStoredServers(): ServerModel[] {
   try {
     const s = localStorage.getItem("vekrom:servers_list");
-    if (s) return JSON.parse(s);
+    if (s) {
+      const servers = (JSON.parse(s) as ServerModel[]).filter((server) => !["srv_val", "srv_ow", "srv_dev"].includes(server.id));
+      localStorage.setItem("vekrom:servers_list", JSON.stringify(servers));
+      return servers;
+    }
   } catch {}
-  return DEFAULT_SERVERS;
+  return [];
 }
 
 function loadStoredChannels(): Record<string, ChannelModel[]> {
   try {
     const c = localStorage.getItem("vekrom:channels_map");
-    if (c) return JSON.parse(c);
+    if (c) {
+      const channels = JSON.parse(c) as Record<string, ChannelModel[]>;
+      for (const id of ["srv_val", "srv_ow", "srv_dev"]) delete channels[id];
+      localStorage.setItem("vekrom:channels_map", JSON.stringify(channels));
+      return channels;
+    }
   } catch {}
-  return DEFAULT_CHANNELS;
+  return {};
 }
 
 function loadStoredMessages(): Record<string, MessageModel[]> {
   try {
     const m = localStorage.getItem("vekrom:messages_map");
-    if (m) return JSON.parse(m);
+    if (m) {
+      const messages = JSON.parse(m) as Record<string, MessageModel[]>;
+      delete messages.ch_val_gen;
+      for (const [channelId, channelMessages] of Object.entries(messages)) {
+        messages[channelId] = channelMessages.filter((message) => !["m_seed_1", "m_seed_2"].includes(message.id));
+      }
+      localStorage.setItem("vekrom:messages_map", JSON.stringify(messages));
+      return messages;
+    }
   } catch {}
-  return {
-    ch_val_gen: [
-      {
-        id: "m_seed_1",
-        channelId: "ch_val_gen",
-        authorId: "usr_1",
-        content: "Salve squad! Alguém para subir de elo no **VALORANT** hoje à noite? 🎮",
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        editedAt: null,
-        author: { id: "usr_1", username: "Valorant boyS" },
-      },
-      {
-        id: "m_seed_2",
-        channelId: "ch_val_gen",
-        authorId: "usr_2",
-        content: "Opa, bora sim! Tô conectado no canal de voz `Squad 1 (Voz)`",
-        createdAt: new Date(Date.now() - 1800000).toISOString(),
-        editedAt: null,
-        author: { id: "usr_2", username: "Jesus Brown" },
-      },
-    ],
-  };
+  return {};
 }
 
 interface ServerStoreState {
@@ -430,31 +413,16 @@ export const useServerStore = create<ServerStoreState>((set, get) => ({
       position: 0,
     };
 
-    // Welcome message in Chat geral
-    const welcomeMsg: MessageModel = {
-      id: "msg_welcome_" + Date.now(),
-      channelId: newChannelId,
-      authorId: "sys",
-      content: `🎉 Boas-vindas ao servidor **${name}**! Este é o canal **# Chat geral**. Use o botão **+ Criar canal** na barra lateral para adicionar novos canais quando quiser!`,
-      createdAt: new Date().toISOString(),
-      editedAt: null,
-      author: { id: "sys", username: "Vekrom Bot" },
-    };
-
     const updatedServers = [...get().servers, newServer];
     const updatedChannels = {
       ...get().channelsMap,
       [newServerId]: [defaultChannel],
     };
-    const updatedMessages = {
-      ...get().messagesMap,
-      [newChannelId]: [welcomeMsg],
-    };
+    const updatedMessages = get().messagesMap;
 
     try {
       localStorage.setItem("vekrom:servers_list", JSON.stringify(updatedServers));
       localStorage.setItem("vekrom:channels_map", JSON.stringify(updatedChannels));
-      localStorage.setItem("vekrom:messages_map", JSON.stringify(updatedMessages));
     } catch {}
 
     set({

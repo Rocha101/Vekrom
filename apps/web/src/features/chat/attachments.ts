@@ -20,24 +20,10 @@ export function queueFiles(files: FileList | File[], existingCount: number): { q
   return { queued };
 }
 
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
-    reader.readAsDataURL(file);
-  });
-}
-
 export async function uploadPendingAttachments(pending: PendingAttachment[]): Promise<ChatAttachment[]> {
   return Promise.all(pending.map(async ({ file }) => {
-    try {
-      const uploaded = await api.uploadFile(file);
-      return { url: uploaded.url, name: file.name, contentType: uploaded.contentType, sizeBytes: uploaded.sizeBytes };
-    } catch {
-      // O modo de demonstração funciona sem a API; nesse caso a mídia fica no histórico local.
-      return { url: await readAsDataUrl(file), name: file.name, contentType: file.type, sizeBytes: file.size };
-    }
+    const uploaded = await api.uploadFile(file);
+    return { url: uploaded.url, name: file.name, contentType: uploaded.contentType, sizeBytes: uploaded.sizeBytes };
   }));
 }
 

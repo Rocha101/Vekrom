@@ -19,15 +19,15 @@ import { MemberList, type ServerMember } from "./features/members/MemberList";
 import { MemberProfileModal } from "./features/members/MemberProfileModal";
 import { CreateServerModal } from "./features/servers/CreateServerModal";
 import { CreateChannelModal } from "./features/channels/CreateChannelModal";
-import { CURRENT_STREAMER, JESUS_BROWN_CHAT, SOCIAL_PEOPLE, STREAMING_PEOPLE, SocialUser, StreamerProfile } from "./lib/mockData";
-import { Sparkles, ArrowRight, ShieldCheck, Flame, MessageSquare, Radio, Users, LockKeyhole } from "lucide-react";
+import type { SocialUser, StreamerProfile } from "./lib/types";
+import { Sparkles, ArrowRight, LockKeyhole } from "lucide-react";
 
 /* ---------- Modern Auth Pages ---------- */
 function LoginPage() {
   const nav = useNavigate();
   const login = useAuth((s) => s.login);
-  const [email, setEmail] = useState("demo@vekrom.gg");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -40,9 +40,7 @@ function LoginPage() {
       login(r.token, r.user.id, r.user.username);
       nav("/channels/@me");
     } catch {
-      // Demo fallback login so the user can test the UI anytime!
-      login("demo_token", "usr_demo", "Awkiruun");
-      nav("/channels/@me");
+      setErr("Não foi possível entrar. Confira seus dados e verifique se o servidor está disponível.");
     } finally {
       setLoading(false);
     }
@@ -103,20 +101,10 @@ function LoginPage() {
           <ArrowRight size={16} />
         </button>
 
-        <div className="flex items-center justify-between text-xs text-zinc-400 pt-2 border-t border-white/[0.06]">
+        <div className="flex items-center justify-center text-xs text-zinc-400 pt-2 border-t border-white/[0.06]">
           <a href="/register" className="text-[#2563eb] hover:underline font-semibold">
             Criar nova conta
           </a>
-          <button
-            type="button"
-            onClick={() => {
-              login("demo_token", "usr_demo", "Awkiruun");
-              nav("/channels/@me");
-            }}
-            className="text-zinc-400 hover:text-white transition-colors"
-          >
-            Acesso Rápido Demo →
-          </button>
         </div>
       </form>
     </div>
@@ -130,17 +118,18 @@ function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErr("");
     try {
       const r = await api.register(username, email, password);
       login(r.token, r.user.id, r.user.username);
       nav("/channels/@me");
     } catch {
-      login("demo_token", "usr_demo", username || "NovoUsuário");
-      nav("/channels/@me");
+      setErr("Não foi possível criar a conta. Confira os dados e tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -158,6 +147,8 @@ function RegisterPage() {
           <h1 className="text-2xl font-extrabold text-white tracking-tight">Criar Conta</h1>
           <p className="text-xs text-zinc-400 mt-1">Junte-se à comunidade de games e streams</p>
         </div>
+
+        {err && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/15 p-3 text-xs text-rose-300">{err}</div>}
 
         <input
           placeholder="Nome de usuário"
@@ -202,9 +193,10 @@ function RegisterPage() {
 /* ---------- Main App Shell ---------- */
 function Shell() {
   const token = useAuth((s) => s.token);
-  const username = useAuth((s) => s.username) || "Awkiruun";
+  const username = useAuth((s) => s.username) || "Usuário";
   const userId = useAuth((s) => s.userId) || "me";
   const avatarUrl = useAuth((s) => s.avatarUrl);
+  const bio = useAuth((s) => s.bio);
   const logout = useAuth((s) => s.logout);
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -228,12 +220,17 @@ function Shell() {
 
   const voice = useVoice();
   const [profileMember, setProfileMember] = useState<ServerMember | null>(null);
-  const [removedMemberIds, setRemovedMemberIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem("vekrom:removed_members") || "[]") as string[]; } catch { return []; } });
-  const [memberModeration, setMemberModeration] = useState<Record<string, { voiceMuted: boolean; soundMuted: boolean }>>(() => { try { return JSON.parse(localStorage.getItem("vekrom:member_moderation") || "{}") as Record<string, { voiceMuted: boolean; soundMuted: boolean }>; } catch { return {}; } });
-  useEffect(() => { localStorage.setItem("vekrom:removed_members", JSON.stringify(removedMemberIds)); }, [removedMemberIds]);
-  useEffect(() => { localStorage.setItem("vekrom:member_moderation", JSON.stringify(memberModeration)); }, [memberModeration]);
+  const { data: apiFriends = [] } = useQuery({ queryKey: ["friends"], queryFn: api.friends, enabled: Boolean(token) });
+  const friends: SocialUser[] = apiFriends.filter((friend) => friend.status === "accepted").map((friend) => ({
+    id: String(friend.id), name: friend.username, handle: `@${friend.username}#${friend.discriminator}`, avatar: friend.avatarUrl ?? null,
+  }));
+  const currentProfile: StreamerProfile = { id: userId, name: username, handle: `@${username}`, avatar: avatarUrl, bio, recentStreams: [] };
+  const handleAddFriend = async (friendUsername: string) => {
+    await api.addFriend(friendUsername);
+    await qc.invalidateQueries({ queryKey: ["friends"] });
+  };
 
-  // Gateway realtime: conecta com JWT real (demo_token fica offline, sem loop de reconnect)
+  // Gateway realtime: conecta somente com JWT válido.
   useEffect(() => {
     if (token && token.split(".").length === 3) {
       gateway.connect(token);
@@ -281,49 +278,31 @@ function Shell() {
   const canConnectToVoice = isCurrentServerOwner || myRolePermissions.some((permissions) => permissions.connect);
   const channelMessages = channelId ? (messagesMap[channelId] || []) : [];
 
-  // Member list fallback
-  const memberSeeds = [
-    { id: userId, username, handle: `@${username.toLowerCase().replace(/\s+/g, "")}`, avatar: avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(username)}`, status: "online" as const, bio: "Membro da comunidade Vekrom." },
-    { id: "m2", username: JESUS_BROWN_CHAT.user.name, handle: JESUS_BROWN_CHAT.user.handle, avatar: JESUS_BROWN_CHAT.user.avatar, status: JESUS_BROWN_CHAT.user.status, bio: JESUS_BROWN_CHAT.user.bio },
-    { id: "m3", username: SOCIAL_PEOPLE[0].name, handle: SOCIAL_PEOPLE[0].handle, avatar: SOCIAL_PEOPLE[0].avatar, status: SOCIAL_PEOPLE[0].status, bio: SOCIAL_PEOPLE[0].bio },
-    { id: "m4", username: STREAMING_PEOPLE[0].name, handle: STREAMING_PEOPLE[0].handle, avatar: STREAMING_PEOPLE[0].avatar, status: STREAMING_PEOPLE[0].status, bio: STREAMING_PEOPLE[0].bio },
-  ];
-  const memberKey = (memberId: string) => `${serverId}:${memberId}`;
-  const members: ServerMember[] = memberSeeds.filter((member) => !removedMemberIds.includes(memberKey(member.id))).map((member) => ({
-    id: member.id,
-    username: member.username,
-    avatar: member.avatar,
-    handle: member.handle,
-    status: member.status,
-    bio: member.bio,
-    voiceMuted: memberModeration[memberKey(member.id)]?.voiceMuted ?? false,
-    soundMuted: memberModeration[memberKey(member.id)]?.soundMuted ?? false,
+  const { data: serverMembers = [] } = useQuery({
+    queryKey: ["serverMembers", serverId],
+    queryFn: () => api.members(serverId!),
+    enabled: Boolean(token && serverId && /^\d+$/.test(serverId)),
+  });
+  const members: ServerMember[] = serverMembers.map((member) => ({
+    id: String(member.id), username: member.nickname || member.username, avatar: member.avatarUrl || "",
+    handle: `@${member.username}`, status: "unknown" as const,
+    voiceMuted: member.voiceMuted, soundMuted: member.soundMuted,
     roleNames: [
-      ...(member.id === userId && isCurrentServerOwner ? [{ name: "Dono", color: "#f1c40f" }] : []),
-      ...serverRoles.filter((role) => role.memberIds.includes(member.id)).map((role) => ({ name: role.name, color: role.color })),
+      ...(String(member.id) === userId && isCurrentServerOwner ? [{ name: "Dono", color: "#f1c40f" }] : []),
+      ...serverRoles.filter((role) => role.memberIds.includes(String(member.id))).map((role) => ({ name: role.name, color: role.color })),
     ],
   }));
 
   const handleModerateMember = async (member: ServerMember, action: "kick" | "ban" | "voice_mute" | "sound_mute", enabled = true) => {
     const permitted = action === "kick" ? canKickMembers : action === "ban" ? canBanMembers : action === "voice_mute" ? canMuteMembers : canDeafenMembers;
     if (!currentServer || !permitted) throw new Error("Seu cargo não tem permissão para esta ação.");
-    // Servidores e membros de demonstração usam identificadores não numéricos; neles, a ação atualiza a interface local.
-    const usesApiIds = /^\d+$/.test(currentServer.id) && /^\d+$/.test(member.id);
-    if (usesApiIds) await api.moderateMember(currentServer.id, member.id, action, enabled);
+    if (!/^\d+$/.test(currentServer.id) || !/^\d+$/.test(member.id)) throw new Error("A moderação precisa de um servidor e membros salvos no servidor.");
+    await api.moderateMember(currentServer.id, member.id, action, enabled);
+    await qc.invalidateQueries({ queryKey: ["serverMembers", currentServer.id] });
     if (action === "kick" || action === "ban") {
-      const key = memberKey(member.id);
-      setRemovedMemberIds((ids) => ids.includes(key) ? ids : [...ids, key]);
       setProfileMember(null);
       return;
     }
-    const key = memberKey(member.id);
-    setMemberModeration((current) => ({
-      ...current,
-      [key]: {
-        voiceMuted: action === "voice_mute" ? enabled : current[key]?.voiceMuted ?? false,
-        soundMuted: action === "sound_mute" ? enabled : current[key]?.soundMuted ?? false,
-      },
-    }));
   };
 
   // Auto select first channel when switching or creating server
@@ -372,8 +351,7 @@ function Shell() {
   const handleLeaveServer = () => {
     if (!serverId) return;
     const leavingServerId = serverId;
-    // Remove do servidor selecionado imediatamente. A API é best-effort para
-    // que servidores locais de demonstração também possam ser abandonados.
+    // Remove o servidor selecionado da interface e atualiza a lista da API.
     leaveServerLocal(leavingServerId);
     setSelectedDmUser(null);
     setProfileMember(null);
@@ -431,6 +409,7 @@ function Shell() {
           onCreateChannel={() => setIsCreateChannelOpen(true)}
           onLeaveServer={handleLeaveServer}
           activeDmUserId={selectedDmUser?.id ?? null}
+          friends={friends}
           onSelectDmUser={(u) => setSelectedDmUser(u)}
           onOpenSocial={() => {
             setSelectedDmUser(null);
@@ -481,67 +460,34 @@ function Shell() {
             />
           )
         ) : (
-          /* Home / Mobile Multi-View Mode (Exact mockup views) */
+          /* Home and mobile navigation views */
           <>
             {mobileTab === "profile" && (
               <StreamerProfileView
-                streamer={activeStreamer || CURRENT_STREAMER}
+                streamer={activeStreamer || currentProfile}
                 onBack={() => setMobileTab("social")}
-                onOpenStream={() => setMobileTab("streams")}
               />
             )}
 
             {mobileTab === "social" && (
               <SocialView
                 onBack={() => setMobileTab("home")}
+                friends={friends}
                 onSelectUserForChat={(user) => setSelectedDmUser(user)}
-                onSelectUserForProfile={(user) => {
-                  setActiveStreamer({
-                    ...CURRENT_STREAMER,
-                    id: user.id,
-                    name: user.name,
-                    handle: user.handle,
-                    avatar: user.avatar,
-                    followers: user.followers,
-                    isLive: user.status === "streaming",
-                  });
-                  setMobileTab("profile");
-                }}
+                onAddFriend={handleAddFriend}
               />
             )}
 
-            {mobileTab === "streams" && (
-              <StreamsExploreView
-                onSelectStreamer={(id) => {
-                  setActiveStreamer(CURRENT_STREAMER);
-                  setMobileTab("profile");
-                }}
-              />
-            )}
+            {mobileTab === "streams" && <StreamsExploreView />}
 
-            {mobileTab === "home" && (
-              <StreamsExploreView
-                onSelectStreamer={() => {
-                  setActiveStreamer(CURRENT_STREAMER);
-                  setMobileTab("profile");
-                }}
-              />
-            )}
+            {mobileTab === "home" && <StreamsExploreView />}
 
             {mobileTab === "search" && (
               <SocialView
                 onBack={() => setMobileTab("home")}
+                friends={friends}
                 onSelectUserForChat={(user) => setSelectedDmUser(user)}
-                onSelectUserForProfile={(user) => {
-                  setActiveStreamer({
-                    ...CURRENT_STREAMER,
-                    id: user.id,
-                    name: user.name,
-                    handle: user.handle,
-                    avatar: user.avatar,
-                  });
-                  setMobileTab("profile");
-                }}
+                onAddFriend={handleAddFriend}
               />
             )}
           </>
@@ -602,6 +548,7 @@ function Shell() {
                   if (id === channelId) setChannel(null);
                 }}
                 activeDmUserId={selectedDmUser?.id ?? null}
+                friends={friends}
                 onSelectDmUser={(u) => {
                   setSelectedDmUser(u);
                   toggleChannels();
@@ -626,7 +573,7 @@ function Shell() {
               setMobileTab(tab);
               if (serverId) setServer(null);
             }}
-            userAvatar={CURRENT_STREAMER.avatar}
+            userAvatar={avatarUrl ?? undefined}
           />
         )}
       </main>
@@ -659,9 +606,6 @@ function Shell() {
             name: member.username,
             handle: member.handle,
             avatar: member.avatar,
-            followers: "Membro do servidor",
-            verified: false,
-            status: member.status,
             bio: member.bio,
           });
           setProfileMember(null);

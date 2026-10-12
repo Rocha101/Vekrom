@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Users, Search } from "lucide-react";
+import { Home, Users, Search, UserRound } from "lucide-react";
 import { MobileTab } from "../../stores";
 
 interface BottomNavProps {
@@ -64,12 +64,8 @@ export function BottomNav({ activeTab, onTabChange, userAvatar }: BottomNavProps
         }`}
         aria-label="Perfil"
       >
-        <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-800 border border-white/10">
-          <img
-            src={userAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"}
-            alt="Avatar"
-            className="w-full h-full object-cover"
-          />
+        <div className="grid h-7 w-7 place-items-center overflow-hidden rounded-full border border-white/10 bg-zinc-800">
+          {userAvatar ? <img src={userAvatar} alt="Foto de perfil" className="h-full w-full object-cover" /> : <UserRound size={15} className="text-zinc-400" />}
         </div>
       </button>
     </nav>

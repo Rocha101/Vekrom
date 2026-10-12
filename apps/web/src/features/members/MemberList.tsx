@@ -5,7 +5,7 @@ export interface ServerMember {
   username: string;
   avatar: string;
   handle: string;
-  status: "online" | "idle" | "offline" | "dnd" | "streaming";
+  status: "online" | "idle" | "offline" | "dnd" | "streaming" | "unknown";
   bio?: string;
   voiceMuted?: boolean;
   soundMuted?: boolean;
@@ -23,10 +23,10 @@ const statusMeta = {
   offline: { label: "Offline", dot: "bg-zinc-500" },
   dnd: { label: "Não perturbe", dot: "bg-rose-400" },
   streaming: { label: "Ao vivo", dot: "bg-violet-400" },
+  unknown: { label: "Status indisponível", dot: "bg-zinc-600" },
 };
 
 export function MemberList({ members, onSelectMember }: MemberListProps) {
-  const onlineCount = members.filter((member) => member.status !== "offline").length;
   const roleGroups = new Map<string, { color: string; members: ServerMember[] }>();
   for (const member of members) {
     const role = member.roleNames[0] ?? { name: "Sem cargo", color: "#71717a" };
@@ -34,7 +34,7 @@ export function MemberList({ members, onSelectMember }: MemberListProps) {
     group.members.push(member);
     roleGroups.set(role.name, group);
   }
-  const activeStatusOrder: ServerMember["status"][] = ["online", "streaming", "idle", "dnd"];
+  const activeStatusOrder: ServerMember["status"][] = ["online", "streaming", "idle", "dnd", "unknown"];
   const renderMember = (member: ServerMember) => {
     const meta = statusMeta[member.status];
     return <button
@@ -43,7 +43,7 @@ export function MemberList({ members, onSelectMember }: MemberListProps) {
       className="group flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
       aria-label={`Abrir perfil de ${member.username}`}
     >
-      <span className="relative shrink-0"><img src={member.avatar} alt="" className="h-8 w-8 rounded-full border border-white/10 bg-[#242631] object-cover"/><span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#10121a] ${meta.dot}`}/></span>
+      <span className="relative shrink-0">{member.avatar ? <img src={member.avatar} alt="" className="h-8 w-8 rounded-full border border-white/10 bg-[#242631] object-cover"/> : <span className="grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-[#242631] text-[10px] font-semibold text-zinc-200">{member.username.slice(0, 2).toUpperCase()}</span>}<span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#10121a] ${meta.dot}`} title={meta.label}/></span>
       <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-zinc-200 group-hover:text-white">{member.username}</span>
       {member.roleNames.some((role) => role.name.toLowerCase().includes("dono")) && <Crown size={11} className="shrink-0 text-amber-300"/>}
       <ChevronRight size={13} className="shrink-0 text-zinc-600 opacity-0 transition-opacity group-hover:opacity-100"/>
@@ -55,7 +55,7 @@ export function MemberList({ members, onSelectMember }: MemberListProps) {
       <div className="mb-2 flex items-center justify-between px-1.5">
         <div>
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-zinc-300">Membros</h2>
-          <p className="mt-0.5 text-[10px] text-zinc-500">{onlineCount} online · {members.length} total</p>
+          <p className="mt-0.5 text-[10px] text-zinc-500">{members.length} no servidor</p>
         </div>
         <CircleDot size={13} className="text-emerald-400" />
       </div>

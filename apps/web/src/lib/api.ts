@@ -4,6 +4,8 @@ export interface Server { id: string; name: string; iconUrl: string | null; owne
 export interface Channel { id: string; serverId: string | null; name: string; type: string; topic: string | null; position: number; isPrivate?: boolean; userLimit?: number; }
 export interface ChatAttachment { url: string; name: string; contentType: string; sizeBytes: number; }
 export interface ChatMessage { id: string; channelId: string; authorId: string; content: string; createdAt: string; editedAt: string | null; attachments?: ChatAttachment[]; author?: { id: string; username: string } | null; }
+export interface Friend { id: string; username: string; discriminator: string; avatarUrl: string | null; status: "accepted" | "pending" | "blocked"; }
+export interface DirectMessage { id: string | number; senderId: string; recipientId: string; content: string; createdAt: string; attachments?: ChatAttachment[]; }
 
 function token(): string | null { return localStorage.getItem("vekrom:token"); }
 
@@ -39,8 +41,8 @@ export const api = {
   createChannel(serverId: string, name: string): Promise<unknown> {
     return req(`/servers/${serverId}/channels`, { method: "POST", body: JSON.stringify({ name }) });
   },
-  members(serverId: string): Promise<Array<{ id: string; username: string }>> {
-    return req<{ members: Array<{ id: string; username: string }> }>(`/servers/${serverId}/members`).then((r) => r.members);
+  members(serverId: string): Promise<Array<{ id: string; username: string; nickname: string | null; avatarUrl: string | null; voiceMuted: boolean; soundMuted: boolean }>> {
+    return req<{ members: Array<{ id: string; username: string; nickname: string | null; avatarUrl: string | null; voiceMuted: boolean; soundMuted: boolean }> }>(`/servers/${serverId}/members`).then((r) => r.members);
   },
   moderateMember(serverId: string, memberId: string, action: "kick" | "ban" | "voice_mute" | "sound_mute", enabled = true): Promise<{ ok: boolean }> {
     return req(`/servers/${serverId}/members/${memberId}/moderation`, { method: "POST", body: JSON.stringify({ action, enabled }) });
@@ -73,11 +75,17 @@ export const api = {
     if (!res.ok) throw new Error(`Upload ${res.status}`);
     return res.json();
   },
-  friends(): Promise<Array<{ id: string; username: string; status: string }>> {
-    return req<{ friends: Array<{ id: string; username: string; status: string }> }>("/friends").then((r) => r.friends);
+  friends(): Promise<Friend[]> {
+    return req<{ friends: Friend[] }>("/friends").then((r) => r.friends);
   },
   addFriend(username: string): Promise<unknown> {
     return req("/friends", { method: "POST", body: JSON.stringify({ username }) });
+  },
+  directMessages(userId: string): Promise<DirectMessage[]> {
+    return req<{ items: DirectMessage[] }>(`/dms/${encodeURIComponent(userId)}/messages`).then((r) => r.items);
+  },
+  sendDirectMessage(userId: string, content: string, attachments: ChatAttachment[] = []): Promise<DirectMessage> {
+    return req<{ message: DirectMessage }>(`/dms/${encodeURIComponent(userId)}/messages`, { method: "POST", body: JSON.stringify({ content: content || " ", attachments: attachments.filter((attachment) => !attachment.url.startsWith("data:")) }) }).then((r) => r.message);
   },
 };
 

@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronLeft, MoreHorizontal, Send, Camera, Flame, Phone, Video, Music2, X } from "lucide-react";
-import { JESUS_BROWN_CHAT, SocialUser } from "../../lib/mockData";
-import type { ChatAttachment } from "../../lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, MoreHorizontal, Send, Camera, Phone, Video, Music2, X } from "lucide-react";
+import type { SocialUser } from "../../lib/types";
+import { api, type ChatAttachment } from "../../lib/api";
+import { useAuth } from "../../stores";
 import { MAX_ATTACHMENTS, PendingAttachment, queueFiles, revokePendingAttachments, uploadPendingAttachments } from "./attachments";
 
 interface Message {
-  id: string;
+  id: string | number;
   sender: "them" | "me";
   text: string;
   time: string;
@@ -13,17 +15,29 @@ interface Message {
 }
 
 interface DirectChatViewProps {
-  user?: SocialUser;
+  user: SocialUser;
   onBack?: () => void;
   onOpenVoiceCall?: (user: SocialUser) => void;
 }
 
 export function DirectChatView({
-  user = JESUS_BROWN_CHAT.user,
+  user,
   onBack,
   onOpenVoiceCall,
 }: DirectChatViewProps) {
-  const [messages, setMessages] = useState<Message[]>(JESUS_BROWN_CHAT.messages);
+  const queryClient = useQueryClient();
+  const currentUserId = useAuth((state) => state.userId);
+  const { data: storedMessages = [], isLoading: loadingMessages, isError: failedMessages } = useQuery({
+    queryKey: ["directMessages", user.id],
+    queryFn: () => api.directMessages(user.id),
+  });
+  const messages: Message[] = storedMessages.map((message) => ({
+    id: message.id,
+    sender: String(message.senderId) === String(currentUserId) ? "me" : "them",
+    text: message.content,
+    time: new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    attachments: message.attachments,
+  }));
   const [inputValue, setInputValue] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
@@ -52,40 +66,17 @@ export function DirectChatView({
     if (!inputValue.trim() && !pendingAttachments.length) return;
     setSending(true);
     setAttachmentError("");
-    let attachments: ChatAttachment[];
     try {
-      attachments = await uploadPendingAttachments(pendingAttachments);
+      const attachments: ChatAttachment[] = await uploadPendingAttachments(pendingAttachments);
+      await api.sendDirectMessage(user.id, inputValue.trim(), attachments);
+      await queryClient.invalidateQueries({ queryKey: ["directMessages", user.id] });
+      setInputValue("");
+      revokePendingAttachments(pendingAttachments);
+      setPendingAttachments([]);
     } catch {
-      setAttachmentError("Não foi possível anexar o arquivo. Tente novamente.");
+      setAttachmentError("Não foi possível enviar a mensagem. Verifique sua conexão e tente novamente.");
+    } finally {
       setSending(false);
-      return;
-    }
-
-    const newMsg: Message = {
-      id: "msg_" + Date.now(),
-      sender: "me",
-      text: inputValue.trim(),
-      time: "Just now",
-      attachments,
-    };
-
-    setMessages((prev) => [...prev, newMsg]);
-    setInputValue("");
-    revokePendingAttachments(pendingAttachments);
-    setPendingAttachments([]);
-    setSending(false);
-
-    // Realistic simulated reply after 1.2s if talking to Jesus Brown
-    if (user.id === "jesus_brown") {
-      setTimeout(() => {
-        const replyMsg: Message = {
-          id: "msg_" + Date.now() + 1,
-          sender: "them",
-          text: "Awesome! Testing the latest build right now 🚀",
-          time: "Just now",
-        };
-        setMessages((prev) => [...prev, replyMsg]);
-      }, 1200);
     }
   };
 
@@ -108,26 +99,20 @@ export function DirectChatView({
           {/* User Details */}
           <div className="flex items-center gap-2.5">
             <div className="relative flex-shrink-0">
-              <img
+              {user.avatar ? <img
                 src={user.avatar}
                 alt={user.name}
                 className="w-9 h-9 rounded-full object-cover border border-white/10"
-              />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0d0e12]" />
+              /> : <span className="grid h-9 w-9 place-items-center rounded-full bg-[#242631] text-xs font-semibold text-zinc-200">{user.name.slice(0, 2).toUpperCase()}</span>}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <h1 className="text-sm font-bold text-white tracking-wide leading-tight">
                   {user.name}
                 </h1>
-                {user.streak && (
-                  <span title="Streak ativo">
-                    <Flame size={13} className="text-amber-400 fill-amber-400" />
-                  </span>
-                )}
               </div>
               <span className="text-[11px] text-zinc-400 block leading-tight">
-                {user.status === "online" ? "Online agora" : user.lastActive || "Ativo recentemente"}
+                {user.handle}
               </span>
             </div>
           </div>
@@ -160,12 +145,9 @@ export function DirectChatView({
 
       {/* Messages Scroll View */}
       <div className="flex-1 overflow-y-auto scroll-thin px-4 py-4 space-y-4 max-w-3xl mx-auto w-full">
-        {/* Date separator */}
-        <div className="flex items-center justify-center my-1">
-          <span className="text-[11px] font-medium text-zinc-400 bg-[#161822] border border-white/[0.06] px-3.5 py-1 rounded-full shadow-sm">
-            Hoje
-          </span>
-        </div>
+        {loadingMessages && <p className="py-8 text-center text-sm text-zinc-400">Carregando mensagens…</p>}
+        {failedMessages && <p role="alert" className="py-8 text-center text-sm text-rose-300">Não foi possível carregar as mensagens.</p>}
+        {!loadingMessages && !failedMessages && messages.length === 0 && <p className="py-8 text-center text-sm text-zinc-400">Ainda não há mensagens nesta conversa.</p>}
 
         {/* Message Clusters */}
         {messages.map((msg, idx) => {
@@ -178,13 +160,12 @@ export function DirectChatView({
               {/* Header above their first message matching Screen 3 */}
               {isThem && isFirstInCluster && (
                 <div className="flex items-center gap-2 mb-1.5 pl-1">
-                  <img
+                  {user.avatar ? <img
                     src={user.avatar}
                     alt={user.name}
                     className="w-6 h-6 rounded-full object-cover border border-white/10"
-                  />
+                  /> : <span className="grid h-6 w-6 place-items-center rounded-full bg-[#242631] text-[9px] font-semibold">{user.name.slice(0, 2).toUpperCase()}</span>}
                   <span className="text-xs font-bold text-white">{user.name}</span>
-                  <Flame size={12} className="text-amber-400 fill-amber-400" />
                   <span className="text-[11px] text-zinc-400">{msg.time}</span>
                 </div>
               )}

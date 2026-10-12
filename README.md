@@ -33,5 +33,4 @@ pnpm dev
 
 ```bash
 psql $DATABASE_URL -f apps/api/src/db/migrations/001_init.sql
-psql $DATABASE_URL -f apps/api/src/db/seed.sql
 ```

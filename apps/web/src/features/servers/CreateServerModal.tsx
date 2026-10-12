@@ -24,35 +24,12 @@ interface CreateServerModalProps {
 
 type ModalStep = "templates" | "customize" | "join";
 
-const PRESET_ICONS = [
-  {
-    id: "valorant",
-    label: "Valorant",
-    url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=200&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "cyberpunk",
-    label: "Cyberpunk",
-    url: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=200&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "arcade",
-    label: "Retro Arcade",
-    url: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=200&auto=format&fit=crop&q=80",
-  },
-  {
-    id: "esports",
-    label: "Esports Cup",
-    url: "https://images.unsplash.com/photo-1534423861386-85a16f5d13fd?w=200&auto=format&fit=crop&q=80",
-  },
-];
-
 export function CreateServerModal({
   isOpen,
   onClose,
   onCreateServer,
   onJoinServer,
-  username = "Awkiruun",
+  username = "Usuário",
 }: CreateServerModalProps) {
   const [step, setStep] = useState<ModalStep>("templates");
   const [serverName, setServerName] = useState(`Servidor de ${username}`);
@@ -356,29 +333,6 @@ export function CreateServerModal({
                 {serverIcon ? "Foto de capa selecionada!" : "Toque acima para escolher uma foto do seu computador"}
               </span>
 
-              {/* Preset Icon Selector */}
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                  Ou escolha um ícone:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {PRESET_ICONS.map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => setServerIcon(preset.url)}
-                      title={preset.label}
-                      className={`w-7 h-7 rounded-full overflow-hidden border transition-all ${
-                        serverIcon === preset.url
-                          ? "ring-2 ring-[#2563eb] border-white scale-110"
-                          : "border-white/10 hover:border-white/40 opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             {/* Server Name Input */}

@@ -32,8 +32,8 @@ export function MemberProfileModal({ member, serverName, onClose, onMessage, can
       </div>
       <div className="relative px-5 pb-5">
         <div className="relative inline-block">
-          <img src={member.avatar} alt={`Foto de ${member.username}`} className="h-24 w-24 rounded-full border-[5px] border-[#101114] bg-[#242631] object-cover shadow-xl"/>
-          <span className={`absolute bottom-1 right-1 h-5 w-5 rounded-full border-[3px] border-[#101114] ${member.status === "offline" ? "bg-zinc-500" : member.status === "dnd" ? "bg-rose-400" : member.status === "idle" ? "bg-amber-400" : member.status === "streaming" ? "bg-violet-400" : "bg-emerald-400"}`} />
+          {member.avatar ? <img src={member.avatar} alt={`Foto de ${member.username}`} className="h-24 w-24 rounded-full border-[5px] border-[#101114] bg-[#242631] object-cover shadow-xl"/> : <span className="grid h-24 w-24 place-items-center rounded-full border-[5px] border-[#101114] bg-[#242631] text-2xl font-bold text-zinc-200">{member.username.slice(0, 2).toUpperCase()}</span>}
+          {member.status !== "unknown" && <span className={`absolute bottom-1 right-1 h-5 w-5 rounded-full border-[3px] border-[#101114] ${member.status === "offline" ? "bg-zinc-500" : member.status === "dnd" ? "bg-rose-400" : member.status === "idle" ? "bg-amber-400" : member.status === "streaming" ? "bg-violet-400" : "bg-emerald-400"}`} />}
         </div>
         <h2 className="mt-2 text-xl font-extrabold text-white">{member.username}</h2>
         <p className="text-sm text-zinc-400">{member.handle}</p>

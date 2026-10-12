@@ -79,7 +79,7 @@ export const coreRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/servers/:id/members", { preHandler: [app.authenticate] }, async (req) => {
     const { rows } = await pool.query(
-      `SELECT u.id, u.username, u.discriminator, u.avatar_url AS "avatarUrl", m.nickname, m.joined_at AS "joinedAt"
+      `SELECT u.id, u.username, u.discriminator, u.avatar_url AS "avatarUrl", m.nickname, m.joined_at AS "joinedAt", m.voice_muted AS "voiceMuted", m.sound_muted AS "soundMuted"
        FROM server_members m JOIN users u ON u.id=m.user_id WHERE m.server_id=$1 AND m.status='member' ORDER BY u.username LIMIT 200`,
       [(req.params as { id: string }).id],
     );

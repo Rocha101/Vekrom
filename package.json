@@ -20,8 +20,7 @@
     "build:web": "pnpm --filter @vekrom/web build",
     "lint": "pnpm -r lint",
     "typecheck": "tsc --noEmit -p tsconfig.base.json",
-    "db:migrate": "psql $DATABASE_URL -f apps/api/src/db/migrations/001_init.sql",
-    "db:seed": "psql $DATABASE_URL -f apps/api/src/db/seed.sql"
+    "db:migrate": "psql $DATABASE_URL -f apps/api/src/db/migrations/001_init.sql"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
