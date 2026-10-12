@@ -1,50 +1,45 @@
--- seed.sql — dados de desenvolvimento
--- Roda com: psql $DATABASE_URL -f apps/api/src/db/seed.sql
--- password_hash é placeholder ('devhash'); API real usa bcrypt.
+-- seed.sql — dados de desenvolvimento (NUNCA rode em produção; `pnpm db:seed` recusa com NODE_ENV=production)
+-- Usuários: alice@example.com / bob@example.com, senha: password123
+-- Sem ids fixos: as colunas são GENERATED ALWAYS AS IDENTITY.
 
-INSERT INTO users (id, username, discriminator, email, password_hash) VALUES
-  (1, 'alice', '0001', 'alice@example.com', 'devhash-alice'),
-  (2, 'bob',   '0002', 'bob@example.com',   'devhash-bob')
-ON CONFLICT (id) DO UPDATE SET
-  username = EXCLUDED.username,
-  email = EXCLUDED.email;
-SELECT setval(pg_get_serial_sequence('users','id'), (SELECT MAX(id) FROM users));
-
-INSERT INTO servers (id, name, owner_id) VALUES
-  (1, 'Vekrom HQ', 1)
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
-SELECT setval(pg_get_serial_sequence('servers','id'), (SELECT MAX(id) FROM servers));
-
-INSERT INTO server_members (server_id, user_id, nickname, status) VALUES
-  (1, 1, 'alice', 'member'),
-  (1, 2, 'bob',   'member')
-ON CONFLICT (server_id, user_id) DO NOTHING;
-
-INSERT INTO roles (id, server_id, name, permissions, position) VALUES
-  (1, 1, 'admin',  1, 100),   -- ADMINISTRATOR = 1<<0
-  (2, 1, 'member', 384, 0)    -- SEND_MESSAGES(128) | READ_MESSAGES(256)
-ON CONFLICT (id) DO NOTHING;
-SELECT setval(pg_get_serial_sequence('roles','id'), (SELECT MAX(id) FROM roles));
-
-INSERT INTO member_roles (server_id, user_id, role_id) VALUES
-  (1, 1, 1),
-  (1, 2, 2)
-ON CONFLICT DO NOTHING;
-
-INSERT INTO channels (id, server_id, name, type, topic, position) VALUES
-  (1, 1, 'general', 'text', 'Conversa geral', 0),
-  (2, 1, 'random',  'text', 'Off-topic', 1)
-ON CONFLICT (id) DO NOTHING;
-SELECT setval(pg_get_serial_sequence('channels','id'), (SELECT MAX(id) FROM channels));
-
-INSERT INTO messages (channel_id, author_id, content) VALUES
-  (1, 1, 'Bem-vindos ao Vekrom!'),
-  (1, 2, 'Opa! Tudo certo por aqui.'),
-  (2, 1, 'Canal random criado para testes.');
-
-INSERT INTO friendships (requester_id, addressee_id, status) VALUES
-  (1, 2, 'accepted')
-ON CONFLICT (requester_id, addressee_id) DO UPDATE SET status = 'accepted';
-
-INSERT INTO direct_messages (sender_id, recipient_id, content) VALUES
-  (1, 2, 'E aí, testando DM!');
+WITH a AS (
+  INSERT INTO users (username, discriminator, email, password_hash)
+  VALUES ('alice', '0001', 'alice@example.com', '$2a$10$eBWK2sz2rncK2OKB6U0td.TFJWTq0QbUW6uDZPLX6E0NWOUF34sFe')
+  ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
+  RETURNING id
+), b AS (
+  INSERT INTO users (username, discriminator, email, password_hash)
+  VALUES ('bob', '0002', 'bob@example.com', '$2a$10$eBWK2sz2rncK2OKB6U0td.TFJWTq0QbUW6uDZPLX6E0NWOUF34sFe')
+  ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username
+  RETURNING id
+), s AS (
+  INSERT INTO servers (name, owner_id) SELECT 'Vekrom HQ', a.id FROM a
+  WHERE NOT EXISTS (SELECT 1 FROM servers WHERE name = 'Vekrom HQ')  -- idempotente
+  RETURNING id, owner_id
+), m AS (
+  INSERT INTO server_members (server_id, user_id, status)
+  SELECT s.id, a.id, 'member' FROM s, a UNION ALL SELECT s.id, b.id, 'member' FROM s, b
+  RETURNING server_id
+), r AS (
+  INSERT INTO roles (server_id, name, permissions, position, color)
+  SELECT s.id, 'admin', 1, 100, 16733530 FROM s UNION ALL SELECT s.id, '@everyone', 0, 0, NULL FROM s
+  RETURNING id
+), c AS (
+  INSERT INTO channels (server_id, name, type, topic, position)
+  SELECT s.id, 'geral', 'text', 'Conversa geral', 0 FROM s
+  UNION ALL SELECT s.id, 'random', 'text', 'Off-topic', 1 FROM s
+  UNION ALL SELECT s.id, 'Voz Geral', 'voice', NULL, 2 FROM s
+  RETURNING id, name
+), msg AS (
+  INSERT INTO messages (channel_id, author_id, content)
+  SELECT c.id, a.id, 'Bem-vindos ao Vekrom!' FROM c, a WHERE c.name = 'geral'
+  UNION ALL SELECT c.id, b.id, 'Opa! Tudo certo por aqui.' FROM c, b WHERE c.name = 'geral'
+  RETURNING id
+), f AS (
+  INSERT INTO friendships (requester_id, addressee_id, status)
+  SELECT a.id, b.id, 'accepted' FROM a, b
+  ON CONFLICT (requester_id, addressee_id) DO UPDATE SET status = 'accepted'
+  RETURNING id
+)
+INSERT INTO direct_messages (sender_id, recipient_id, content)
+SELECT a.id, b.id, 'E aí, testando DM!' FROM a, b WHERE EXISTS (SELECT 1 FROM s);
