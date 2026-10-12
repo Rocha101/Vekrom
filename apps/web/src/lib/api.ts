@@ -20,7 +20,7 @@ function token(): string | null { return localStorage.getItem("vekrom:token"); }
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(token() ? { Authorization: `Bearer ${token()}` } : {}), ...(init.headers ?? {}) },
+    headers: { ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}), ...(token() ? { Authorization: `Bearer ${token()}` } : {}), ...(init.headers ?? {}) },
     credentials: "include",
   });
   if (!res.ok) {

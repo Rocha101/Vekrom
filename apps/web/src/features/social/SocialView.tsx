@@ -57,8 +57,10 @@ export function SocialView({ onBack, friends, pendingRequests, onSelectUserForCh
     try {
       await action();
       setFeedback({ text: successText, error: false });
+      return true;
     } catch {
       setFeedback({ text: "Não foi possível atualizar o pedido. Tente novamente.", error: true });
+      return false;
     } finally {
       setBusyRequestId(null);
     }
@@ -77,7 +79,7 @@ export function SocialView({ onBack, friends, pendingRequests, onSelectUserForCh
         <span className="block truncate text-xs text-zinc-400">{request.handle}</span>
       </button>
       {direction === "incoming" ? <>
-        <button disabled={busy} onClick={() => void runRequestAction(request.friendshipId, () => onAcceptRequest(request.friendshipId), `Você e ${request.name} agora são amigos.`)} className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500 text-white transition-colors hover:bg-indigo-400 disabled:opacity-50" title="Aceitar pedido" aria-label={`Aceitar pedido de ${request.name}`}><Check size={17}/></button>
+        <button disabled={busy} onClick={() => void (async () => { const accepted = await runRequestAction(request.friendshipId, () => onAcceptRequest(request.friendshipId), `Você e ${request.name} agora são amigos.`); if (accepted) { setActiveTab("all"); setSearchQuery(""); } })()} className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-500 text-white transition-colors hover:bg-indigo-400 disabled:opacity-50" title="Aceitar pedido" aria-label={`Aceitar pedido de ${request.name}`}><Check size={17}/></button>
         <button disabled={busy} onClick={() => void runRequestAction(request.friendshipId, () => onRemoveRequest(request.friendshipId), "Pedido recusado.")} className="grid h-9 w-9 place-items-center rounded-lg bg-[#24262e] text-zinc-300 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:opacity-50" title="Recusar pedido" aria-label={`Recusar pedido de ${request.name}`}><X size={17}/></button>
       </> : <>
         <span className="hidden items-center gap-1.5 rounded-lg bg-[#22242b] px-3 py-2 text-xs text-zinc-400 sm:flex"><Clock3 size={14}/> Aguardando</span>
@@ -109,7 +111,7 @@ export function SocialView({ onBack, friends, pendingRequests, onSelectUserForCh
       <main className="mx-auto w-full max-w-3xl space-y-6 px-5 py-5">
         {activeTab === "all" ? <section>
           <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Todos os amigos — {filteredFriends.length}</h2>
-          {filteredFriends.length === 0 ? <div className="rounded-xl border border-white/[0.06] bg-[#12141a] px-4 py-8 text-center text-sm text-zinc-400">{searchQuery ? "Nenhum amigo encontrado." : "Você ainda não tem amigos. Adicione alguém pelo nome de usuário."}</div> : <div className="space-y-2">{filteredFriends.map((user) => <div key={user.id} className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#15171d] px-3 py-3 transition-colors hover:border-white/10 hover:bg-[#1b1d24]">{avatar(user)}<button onClick={() => onSelectUserForChat(user)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold text-white">{user.name}</span><span className="block truncate text-xs text-zinc-400">{user.handle}</span></button><button onClick={() => onSelectUserForChat(user)} className="grid h-9 w-9 place-items-center rounded-lg text-zinc-400 transition-colors hover:bg-white/10 hover:text-white" title={`Enviar mensagem para ${user.name}`} aria-label={`Conversar com ${user.name}`}><MessageSquare size={18}/></button></div>)}</div>}
+          {filteredFriends.length === 0 ? <div className="rounded-xl border border-white/[0.06] bg-[#12141a] px-4 py-8 text-center text-sm text-zinc-400">{searchQuery ? "Nenhum amigo encontrado." : "Você ainda não tem amigos. Adicione alguém pelo nome de usuário."}</div> : <div className="space-y-2">{filteredFriends.map((user) => <div key={user.id} className="group flex items-center gap-3 rounded-xl border border-white/[0.05] bg-[#15171d] px-3 py-3 transition-colors hover:border-white/10 hover:bg-[#1b1d24]">{avatar(user)}<button onClick={() => onSelectUserForChat(user)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold text-white">{user.name}</span><span className="block truncate text-xs text-zinc-400">{user.handle}</span></button><button onClick={() => onSelectUserForChat(user)} className="flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-zinc-300 transition-colors hover:bg-indigo-500 hover:text-white" title={`Enviar mensagem para ${user.name}`} aria-label={`Conversar com ${user.name}`}><MessageSquare size={17}/><span>Mensagem</span></button></div>)}</div>}
         </section> : <>
           <section>
             <h2 className="mb-3 px-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Recebidos — {filteredIncoming.length}</h2>
